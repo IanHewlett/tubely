@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"io"
 	"mime"
 	"net/http"
@@ -50,7 +52,25 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	assetPath := getAssetPath(videoID, mediaType)
+	mimeType, _, err := mime.ParseMediaType(mediaType)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid Content-Type", err)
+		return
+	}
+	if mimeType != "image/jpeg" && mimeType != "image/png" {
+		respondWithError(w, http.StatusBadRequest, "Unsupported media type", err)
+		return
+	}
+
+	bytes := make([]byte, 32)
+	_, err = rand.Read(bytes)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to save a file", err)
+		return
+	}
+	base64Name := base64.RawURLEncoding.EncodeToString(bytes)
+
+	assetPath := getAssetPath(base64Name, mediaType)
 	assetDiskPath := cfg.getAssetDiskPath(assetPath)
 
 	dst, err := os.Create(assetDiskPath)
